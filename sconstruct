@@ -39,7 +39,7 @@ NVDA_PYTHON_VERSION = "3.13"
 
 
 # Copy plugin source directory to target directory
-shutil.copytree(PLUGIN_SOURCE_DIR, PLUGIN_TARGET_DIR)
+shutil.copytree(PLUGIN_SOURCE_DIR, PLUGIN_TARGET_DIR, dirs_exist_ok=True)
 
 
 def validateVersionNumber(key: str, val: str, _):
