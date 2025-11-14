@@ -107,6 +107,7 @@ class PaddleOCR(ContentRecognizer):
 					for char in line:
 						rect: RectLTWH = RectLTWH.fromCollection(*[Point(point[0], point[1]) for point in char[2]])
 						words.append({"x": rect.left, "y": rect.top, "width": rect.width, "height": rect.height, "text": char[0]})
+					lines.append(words)
 			else:
 				for box, text in zip(result.boxes.tolist(), result.txts):
 					rect: RectLTWH = RectLTWH.fromCollection(*[Point.fromFloatCollection(*point) for point in box])
