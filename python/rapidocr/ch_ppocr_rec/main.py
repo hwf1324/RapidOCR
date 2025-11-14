@@ -14,17 +14,18 @@
 import math
 import time
 from pathlib import Path
-from typing import Any, Dict
+from typing import List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
+from omegaconf import DictConfig
 
-from rapidocr.inference_engine.base import FileInfo, get_engine
+from ..inference_engine.base import FileInfo, get_engine
 
 from ..utils.download_file import DownloadFile, DownloadFileInput
 from ..utils.log import logger
 from ..utils.vis_res import VisRes
-from .typings import TextRecInput, TextRecOutput
+from .typings import TextRecInput, TextRecOutput, WordInfo
 from .utils import CTCLabelDecode
 
 DEFAULT_DICT_PATH = Path(__file__).parent.parent / "models" / "ppocr_keys_v1.txt"
@@ -33,7 +34,7 @@ DEFAULT_MODEL_PATH = Path(__file__).parent.parent / "models"
 
 
 class TextRecognizer:
-    def __init__(self, cfg: Dict[str, Any]):
+    def __init__(self, cfg: DictConfig):
         self.session = get_engine(cfg.engine_type)(cfg)
 
         # onnx has inner character, other engine get or download character_dict_path
@@ -43,14 +44,14 @@ class TextRecognizer:
             character=character, character_path=character_dict_path
         )
 
-        self.rec_batch_num = cfg["rec_batch_num"]
-        self.rec_image_shape = cfg["rec_img_shape"]
+        self.rec_batch_num: int = cfg["rec_batch_num"]
+        self.rec_image_shape: List[int] = cfg["rec_img_shape"]
 
         self.cfg = cfg
 
-    def get_character_dict(self, cfg):
-        character = None
-        dict_path = cfg.get("rec_keys_path", None)
+    def get_character_dict(self, cfg: DictConfig) -> Tuple[Optional[List[str]], Optional[Union[Path, str]]]:
+        character: Optional[List[str]] = None
+        dict_path: Optional[Union[Path, str]] = cfg.get("rec_keys_path", None)
         if self.session.have_key():
             character = self.session.get_character_list()
             return character, dict_path
@@ -88,13 +89,13 @@ class TextRecognizer:
         img_list = [args.img] if isinstance(args.img, np.ndarray) else args.img
         return_word_box = args.return_word_box
 
-        width_list = [img.shape[1] / float(img.shape[0]) for img in img_list]
+        width_list: List[float] = [img.shape[1] / float(img.shape[0]) for img in img_list]
 
         # Sorting can speed up the recognition process
         indices = np.argsort(np.array(width_list))
 
         img_num = len(img_list)
-        rec_res = [("", 0.0)] * img_num
+        rec_res: List[Tuple[Tuple[str, float], Optional[WordInfo]]] = [(("", 0.0), None)] * img_num
 
         batch_num = self.rec_batch_num
         elapse = 0
@@ -104,14 +105,14 @@ class TextRecognizer:
             # Parameter Alignment for PaddleOCR
             imgC, imgH, imgW = self.rec_image_shape[:3]
             max_wh_ratio = imgW / imgH
-            wh_ratio_list = []
+            wh_ratio_list: List[float] = []
             for ino in range(beg_img_no, end_img_no):
                 h, w = img_list[indices[ino]].shape[0:2]
-                wh_ratio = w * 1.0 / h
+                wh_ratio: float = w * 1.0 / h
                 max_wh_ratio = max(max_wh_ratio, wh_ratio)
                 wh_ratio_list.append(wh_ratio)
 
-            norm_img_batch = []
+            norm_img_batch: List[np.ndarray] = []
             for ino in range(beg_img_no, end_img_no):
                 norm_img = self.resize_norm_img(img_list[indices[ino]], max_wh_ratio)
                 norm_img_batch.append(norm_img[np.newaxis, :])
@@ -152,7 +153,7 @@ class TextRecognizer:
         img_width = int(img_height * max_wh_ratio)
 
         h, w = img.shape[:2]
-        ratio = w / float(h)
+        ratio: float = w / float(h)
         if math.ceil(img_height * ratio) > img_width:
             resized_w = img_width
         else:

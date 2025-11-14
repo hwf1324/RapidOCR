@@ -10,7 +10,7 @@ import pyclipper
 from shapely.geometry import Polygon
 
 from ..utils.log import logger
-from ..utils.utils import save_img
+# from ..utils.utils import save_img
 from ..utils.vis_res import VisRes
 
 
@@ -34,15 +34,15 @@ class TextDetOutput:
         vis = VisRes()
         vis_img = vis.draw_dt_boxes(self.img, self.boxes, self.scores)
 
-        if save_path is not None:
-            save_img(save_path, vis_img)
-            logger.info("Visualization saved as %s", save_path)
+        # if save_path is not None:
+        #     save_img(save_path, vis_img)
+        #     logger.info("Visualization saved as %s", save_path)
         return vis_img
 
 
 class DetPreProcess:
     def __init__(
-        self, limit_side_len: int = 736, limit_type: str = "min", mean=None, std=None
+        self, limit_side_len: int = 736, limit_type: str = "min", mean: Optional[List[float]] = None, std: Optional[List[float]] = None
     ):
         if mean is None:
             mean = [0.5, 0.5, 0.5]

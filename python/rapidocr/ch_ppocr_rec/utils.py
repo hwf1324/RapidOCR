@@ -2,7 +2,7 @@
 # @Author: SWHL
 # @Contact: liekkaskono@163.com
 from pathlib import Path
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, List, Literal, Optional, Tuple, Union
 
 import numpy as np
 
@@ -21,12 +21,12 @@ class CTCLabelDecode:
 
     def __call__(
         self, preds: np.ndarray, return_word_box: bool = False, **kwargs
-    ) -> Tuple[List[Tuple[str, float]], List[Any]]:
-        preds_idx = preds.argmax(axis=2)
-        preds_prob = preds.max(axis=2)
+    ) -> Tuple[List[Tuple[str, float]], List[WordInfo]]:
+        preds_idx: np.ndarray = preds.argmax(axis=2)
+        preds_prob: np.ndarray = preds.max(axis=2)
 
-        wh_ratio_list = kwargs.get("wh_ratio_list", (1.0,))
-        max_wh_ratio = kwargs.get("max_wh_ratio", 1.0)
+        wh_ratio_list: Tuple[float] = kwargs.get("wh_ratio_list", (1.0,))
+        max_wh_ratio: float = kwargs.get("max_wh_ratio", 1.0)
 
         line_results, word_results = self.decode(
             preds_idx,
@@ -88,7 +88,8 @@ class CTCLabelDecode:
         max_wh_ratio: float = 1.0,
         remove_duplicate: bool = False,
     ) -> Tuple[List[Tuple[str, float]], List[WordInfo]]:
-        result_list, result_words_list = [], []
+        result_list: List[Tuple[str, float]] = []
+        result_words_list: List[WordInfo] = []
         ignored_tokens = self.get_ignored_tokens()
         batch_size = len(text_index)
         for batch_idx in range(batch_size):
@@ -105,12 +106,12 @@ class CTCLabelDecode:
                 conf_list = np.array(text_prob[batch_idx][selection]).tolist()
                 conf_list = [round(conf, 5) for conf in conf_list]
             else:
-                conf_list = [1] * len(selection)
+                conf_list = [1.] * len(selection)
 
             if len(conf_list) == 0:
-                conf_list = [0]
+                conf_list = [0.]
 
-            char_list = [
+            char_list: List[str] = [
                 self.character[text_id] for text_id in token_indices[selection]
             ]
             text = "".join(char_list)
@@ -132,12 +133,12 @@ class CTCLabelDecode:
         Group the decoded characters and record the corresponding decoded positions.
         from https://github.com/PaddlePaddle/PaddleOCR/blob/fbba2178d7093f1dffca65a5b963ec277f1a6125/ppocr/postprocess/rec_postprocess.py#L70
         """
-        word_list = []
-        word_col_list = []
-        state_list = []
+        word_list: List[List[str]] = []
+        word_col_list: List[List[int]] = []
+        state_list: List[WordType] = []
 
-        word_content = []
-        word_col_content = []
+        word_content: List[str] = []
+        word_col_content: List[int] = []
 
         valid_col = np.where(selection)[0]
         if len(valid_col) <= 0:

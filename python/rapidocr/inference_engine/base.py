@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, Union
 
 import numpy as np
+from NVDAState import WritePaths
 from omegaconf import OmegaConf
 
 from ..utils.log import logger
@@ -67,7 +68,7 @@ class FileInfo:
 
 class InferSession(abc.ABC):
     model_info = OmegaConf.load(MODEL_URL_PATH)
-    DEFAULT_MODEL_PATH = cur_dir / "models"
+    DEFAULT_MODEL_PATH = Path(WritePaths.modelsDir) / "RapidOCR"
 
     @abc.abstractmethod
     def __init__(self, config):

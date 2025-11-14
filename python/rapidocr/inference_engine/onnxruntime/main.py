@@ -2,11 +2,13 @@
 # @Author: SWHL
 # @Contact: liekkaskono@163.com
 import os
+import threading
 import traceback
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import List
 
 import numpy as np
+from omegaconf import DictConfig
 from onnxruntime import GraphOptimizationLevel, InferenceSession, SessionOptions
 
 from ...utils.download_file import DownloadFile, DownloadFileInput
@@ -16,14 +18,12 @@ from .provider_config import ProviderConfig
 
 
 class OrtInferSession(InferSession):
-    def __init__(self, cfg: Dict[str, Any]):
+    def __init__(self, cfg: DictConfig):
         # support custom session (PR #451)
         session = cfg.get("session", None)
         if session is not None:
             if not isinstance(session, InferenceSession):
-                raise TypeError(
-                    f"Expected session to be an InferenceSession, got {type(session)}"
-                )
+                raise TypeError(f"Expected session to be an InferenceSession, got {type(session)}")
 
             logger.debug("Using the provided InferenceSession for inference.")
             self.session = session
@@ -49,6 +49,7 @@ class OrtInferSession(InferSession):
                 logger=logger,
             )
             DownloadFile.run(download_params)
+            # threading.Thread(target=DownloadFile.run, args=(download_params,)).start()
 
         logger.info(f"Using {model_path}")
         model_path = Path(model_path)
@@ -65,18 +66,18 @@ class OrtInferSession(InferSession):
         provider_cfg.verify_providers(self.session.get_providers())
 
     @staticmethod
-    def _init_sess_opts(cfg: Dict[str, Any]) -> SessionOptions:
+    def _init_sess_opts(cfg: DictConfig) -> SessionOptions:
         sess_opt = SessionOptions()
         sess_opt.log_severity_level = 4
         sess_opt.enable_cpu_mem_arena = cfg.enable_cpu_mem_arena
         sess_opt.graph_optimization_level = GraphOptimizationLevel.ORT_ENABLE_ALL
 
         cpu_nums = os.cpu_count()
-        intra_op_num_threads = cfg.get("intra_op_num_threads", -1)
+        intra_op_num_threads: int = cfg.get("intra_op_num_threads", -1)
         if intra_op_num_threads != -1 and 1 <= intra_op_num_threads <= cpu_nums:
             sess_opt.intra_op_num_threads = intra_op_num_threads
 
-        inter_op_num_threads = cfg.get("inter_op_num_threads", -1)
+        inter_op_num_threads: int = cfg.get("inter_op_num_threads", -1)
         if inter_op_num_threads != -1 and 1 <= inter_op_num_threads <= cpu_nums:
             sess_opt.inter_op_num_threads = inter_op_num_threads
 

@@ -15,21 +15,22 @@
 # @Author: SWHL
 # @Contact: liekkaskono@163.com
 import time
-from typing import Any, Dict
+from typing import List, Literal, Tuple
 
 import numpy as np
+from omegaconf import DictConfig
 
-from rapidocr.inference_engine.base import get_engine
+from ..inference_engine.base import get_engine
 
 from .utils import DBPostProcess, DetPreProcess, TextDetOutput
 
 
 class TextDetector:
-    def __init__(self, cfg: Dict[str, Any]):
-        self.limit_side_len = cfg.get("limit_side_len")
-        self.limit_type = cfg.get("limit_type")
-        self.mean = cfg.get("mean")
-        self.std = cfg.get("std")
+    def __init__(self, cfg: DictConfig):
+        self.limit_side_len: int = cfg.get("limit_side_len")
+        self.limit_type: Literal["min", "max"] = cfg.get("limit_type")
+        self.mean: List[float] = cfg.get("mean")
+        self.std: List[float] = cfg.get("std")
         self.preprocess_op = None
 
         post_process = {
@@ -50,7 +51,7 @@ class TextDetector:
         if img is None:
             raise ValueError("img is None")
 
-        ori_img_shape = img.shape[0], img.shape[1]
+        ori_img_shape: Tuple[int, int] = img.shape[0], img.shape[1]
         self.preprocess_op = self.get_preprocess(max(img.shape[0], img.shape[1]))
         prepro_img = self.preprocess_op(img)
         if prepro_img is None:

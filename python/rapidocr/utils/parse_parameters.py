@@ -72,3 +72,19 @@ class ParseParams(OmegaConf):
             return LangRec(lang_type)
 
         raise ValueError(f"task_type {task_type.value} is not in [Det, Cls, Rec]")
+
+    @staticmethod
+    def _convert_enum_to_value(cfg: DictConfig):
+        cfg.engine_type = cfg.engine_type.value
+        cfg.model_type = cfg.model_type.value
+        cfg.ocr_version = cfg.ocr_version.value
+        cfg.task_type = cfg.task_type.value
+        cfg.lang_type = cfg.lang_type.value
+        return cfg
+
+    @classmethod
+    def save(cls, cfg: DictConfig, file_path: Union[str, Path]) -> None:
+        cfg.Det = cls._convert_enum_to_value(cfg.Det)
+        cfg.Cls = cls._convert_enum_to_value(cfg.Cls)
+        cfg.Rec = cls._convert_enum_to_value(cfg.Rec)
+        OmegaConf.save(cfg, file_path)

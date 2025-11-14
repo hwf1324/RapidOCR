@@ -5,6 +5,7 @@ from typing import Any, Dict, Tuple
 
 import cv2
 import numpy as np
+from PIL import Image
 
 
 def map_boxes_to_original(
@@ -30,16 +31,16 @@ def map_boxes_to_original(
 
 def apply_vertical_padding(
     img: np.ndarray,
-    op_record: Dict[str, Any],
+    op_record: Dict[str, Dict[str, Any]],
     width_height_ratio: float,
     min_height: float,
-) -> Tuple[np.ndarray, Dict[str, Any]]:
+) -> Tuple[np.ndarray, Dict[str, Dict[str, Any]]]:
     h, w = img.shape[:2]
 
     if width_height_ratio == -1:
         use_limit_ratio = False
     else:
-        use_limit_ratio = w / h > width_height_ratio
+        use_limit_ratio: bool = w / h > width_height_ratio
 
     if h <= min_height or use_limit_ratio:
         padding_h = get_padding_h(h, w, width_height_ratio, min_height)
@@ -92,6 +93,58 @@ def get_rotate_crop_image(img: np.ndarray, points: np.ndarray) -> np.ndarray:
     return dst_img
 
 
+# def get_rotate_crop_image(img: np.ndarray, points: np.ndarray) -> np.ndarray:
+# 	# 将numpy数组转换为PIL Image
+# 	pil_img = Image.fromarray(img)
+
+# 	# 计算目标图像的宽度和高度
+# 	img_crop_width = int(
+# 		max(
+# 			np.linalg.norm(points[0] - points[1]),
+# 			np.linalg.norm(points[2] - points[3]),
+# 		)
+# 	)
+# 	img_crop_height = int(
+# 		max(
+# 			np.linalg.norm(points[0] - points[3]),
+# 			np.linalg.norm(points[1] - points[2]),
+# 		)
+# 	)
+
+# 	# 定义源点和目标点
+# 	pts_std = np.array(
+# 		[
+# 			[0, 0],
+# 			[img_crop_width, 0],
+# 			[img_crop_width, img_crop_height],
+# 			[0, img_crop_height],
+# 		],
+# 		dtype=np.float32,
+# 	)
+
+# 	# 使用numpy计算透视变换矩阵
+# 	M = cv2.getPerspectiveTransform(points, pts_std)
+
+# 	# 转换为PIL可以使用的格式
+# 	pil_img_array = np.array(pil_img)
+
+# 	# 使用cv2.warpPerspective进行透视变换（Pillow没有直接的透视变换功能）
+# 	dst_img = cv2.warpPerspective(
+# 		pil_img_array,
+# 		M,
+# 		(img_crop_width, img_crop_height),
+# 		borderMode=cv2.BORDER_REPLICATE,
+# 		flags=cv2.INTER_CUBIC,
+# 	)
+
+# 	# 如果高度/宽度比例大于等于1.5，则旋转90度
+# 	dst_img_height, dst_img_width = dst_img.shape[0:2]
+# 	if dst_img_height * 1.0 / dst_img_width >= 1.5:
+# 		dst_img = np.rot90(dst_img)
+
+# 	return dst_img
+
+
 def resize_image_within_bounds(
     img: np.ndarray, min_side_len: float, max_side_len: float
 ) -> Tuple[np.ndarray, float, float]:
@@ -129,7 +182,8 @@ def reduce_max_side(
     try:
         if int(resize_w) <= 0 or int(resize_h) <= 0:
             raise ResizeImgError("resize_w or resize_h is less than or equal to 0")
-        img = cv2.resize(img, (resize_w, resize_h))
+        img = np.array(Image.fromarray(img).resize((resize_w, resize_h)))
+        # img = cv2.resize(img, (resize_w, resize_h))
     except Exception as exc:
         raise ResizeImgError() from exc
 
@@ -141,47 +195,71 @@ def reduce_max_side(
 def increase_min_side(
     img: np.ndarray, min_side_len: float = 30
 ) -> Tuple[np.ndarray, float, float]:
-    h, w = img.shape[:2]
+	h, w = img.shape[:2]
 
-    ratio = 1.0
-    if min(h, w) < min_side_len:
-        if h < w:
-            ratio = float(min_side_len) / h
-        else:
-            ratio = float(min_side_len) / w
+	ratio = 1.0
+	if min(h, w) < min_side_len:
+		if h < w:
+			ratio = float(min_side_len) / h
+		else:
+			ratio = float(min_side_len) / w
 
-    resize_h = int(h * ratio)
-    resize_w = int(w * ratio)
+	resize_h = int(h * ratio)
+	resize_w = int(w * ratio)
 
-    resize_h = int(round(resize_h / 32) * 32)
-    resize_w = int(round(resize_w / 32) * 32)
+	resize_h = int(round(resize_h / 32) * 32)
+	resize_w = int(round(resize_w / 32) * 32)
 
-    try:
-        if int(resize_w) <= 0 or int(resize_h) <= 0:
-            raise ResizeImgError("resize_w or resize_h is less than or equal to 0")
-        img = cv2.resize(img, (resize_w, resize_h))
-    except Exception as exc:
-        raise ResizeImgError() from exc
+	try:
+		if int(resize_w) <= 0 or int(resize_h) <= 0:
+			raise ResizeImgError("resize_w or resize_h is less than or equal to 0")
+		img = np.array(Image.fromarray(img).resize((resize_w, resize_h)))
+		# img = cv2.resize(img, (resize_w, resize_h))
+	except Exception as exc:
+		raise ResizeImgError() from exc
 
-    ratio_h = h / resize_h
-    ratio_w = w / resize_w
-    return img, ratio_h, ratio_w
+	ratio_h = h / resize_h
+	ratio_w = w / resize_w
+	return img, ratio_h, ratio_w
 
 
-def add_round_letterbox(
-    img: np.ndarray, padding_tuple: Tuple[int, int, int, int]
-) -> np.ndarray:
-    padded_img = cv2.copyMakeBorder(
-        img,
-        padding_tuple[0],
-        padding_tuple[1],
-        padding_tuple[2],
-        padding_tuple[3],
-        cv2.BORDER_CONSTANT,
-        value=(0, 0, 0),
-    )
-    return padded_img
+# def add_round_letterbox(
+#     img: np.ndarray, padding_tuple: Tuple[int, int, int, int]
+# ) -> np.ndarray:
+    # padded_img = cv2.copyMakeBorder(
+    #     img,
+    #     padding_tuple[0],
+    #     padding_tuple[1],
+    #     padding_tuple[2],
+    #     padding_tuple[3],
+    #     cv2.BORDER_CONSTANT,
+    #     value=(0, 0, 0),
+    # )
+    # return padded_img
 
+
+def add_round_letterbox(img: np.ndarray, padding_tuple: tuple[int, int, int, int]) -> np.ndarray:
+	# 将 numpy 数组转换为 PIL Image
+	pil_img = Image.fromarray(img)
+
+	# 获取原始图像尺寸
+	original_width, original_height = pil_img.size
+
+	# 计算新图像尺寸（添加边框后）
+	top, bottom, left, right = padding_tuple
+	new_width = original_width + left + right
+	new_height = original_height + top + bottom
+
+	# 创建新的图像并填充黑色背景
+	new_img = Image.new(pil_img.mode, (new_width, new_height), (0, 0, 0))
+
+	# 将原图粘贴到新图像的指定位置
+	new_img.paste(pil_img, (left, top))
+
+	# 转换回 numpy 数组
+	padded_img = np.array(new_img)
+
+	return padded_img
 
 class ResizeImgError(Exception):
     pass

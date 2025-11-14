@@ -7,10 +7,10 @@ from typing import Any, Union
 
 import cv2
 import numpy as np
-import requests
+# import requests
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from .utils import is_url
+# from .utils import is_url
 
 root_dir = Path(__file__).resolve().parent
 InputType = Union[str, np.ndarray, bytes, Path, Image.Image]
@@ -32,20 +32,20 @@ class LoadImage:
         return img
 
     def load_img(self, img: InputType) -> np.ndarray:
-        if isinstance(img, (str, Path)):
-            if is_url(str(img)):
-                img = Image.open(requests.get(img, stream=True, timeout=60).raw)
-            else:
-                self.verify_exist(img)
-                img = Image.open(img)
+        # if isinstance(img, (str, Path)):
+        #     if is_url(str(img)):
+        #         img = Image.open(requests.get(img, stream=True, timeout=60).raw)
+        #     else:
+        #         self.verify_exist(img)
+        #         img = Image.open(img)
 
-            img = self.exif_transpose(img)
+        #     img = self.exif_transpose(img)
 
-            try:
-                img = self.img_to_ndarray(img)
-            except UnidentifiedImageError as e:
-                raise LoadImageError(f"cannot identify image file {img}") from e
-            return img
+        #     try:
+        #         img = self.img_to_ndarray(img)
+        #     except UnidentifiedImageError as e:
+        #         raise LoadImageError(f"cannot identify image file {img}") from e
+        #     return img
 
         if isinstance(img, bytes):
             img = self.img_to_ndarray(Image.open(BytesIO(img)))
@@ -131,7 +131,7 @@ class LoadImage:
 
         new_img = cv2.bitwise_and(new_img, new_img, mask=a)
 
-        mean_color = np.mean(new_img)
+        mean_color: float = np.mean(new_img)
         if mean_color <= 0.0:
             new_img = cv2.add(new_img, not_a)
         else:

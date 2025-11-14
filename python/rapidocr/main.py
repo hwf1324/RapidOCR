@@ -1,20 +1,22 @@
 # -*- encoding: utf-8 -*-
-# @Author: SWHL
-# @Contact: liekkaskono@163.com
-import argparse
+# @Author: SWHL, hwf1324
+# @Contact: liekkaskono@163.com, 1398969445@qq.com
+
+# import argparse
 import copy
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import cv2
+# import cv2
 import numpy as np
+from NVDAState import WritePaths
 from omegaconf import DictConfig
 
 from .cal_rec_boxes import CalRecBoxes
 from .ch_ppocr_cls import TextClassifier, TextClsOutput
 from .ch_ppocr_det import TextDetector, TextDetOutput
 from .ch_ppocr_rec import TextRecInput, TextRecognizer, TextRecOutput
-from .cli import check_install, generate_cfg
+# from .cli import check_install, generate_cfg
 from .utils.load_image import LoadImage
 from .utils.log import logger
 from .utils.output import RapidOCROutput
@@ -25,11 +27,12 @@ from .utils.process_img import (
     map_boxes_to_original,
     resize_image_within_bounds,
 )
-from .utils.typings import LangRec
-from .utils.vis_res import VisRes
+# from .utils.typings import LangRec
+# from .utils.vis_res import VisRes
 
 root_dir = Path(__file__).resolve().parent
 DEFAULT_CFG_PATH = root_dir / "config.yaml"
+USER_CFG_PATH = Path(WritePaths.modelsDir) / "RapidOCR" / "config.yaml"
 
 
 class RapidOCR:
@@ -38,15 +41,18 @@ class RapidOCR:
     ):
         cfg = self._load_config(config_path, params)
 
-        logger.setLevel(cfg.Global.log_level.upper())
+        # logger.setLevel(cfg.Global.log_level.upper())
 
         self._initialize(cfg)
 
+    @staticmethod
     def _load_config(
-        self, config_path: Optional[str], params: Optional[Dict[str, Any]]
+        config_path: Optional[str], params: Optional[Dict[str, Any]]
     ) -> DictConfig:
         if config_path is not None and Path(config_path).exists():
             cfg = ParseParams.load(config_path)
+        elif Path(USER_CFG_PATH).exists():
+            cfg = ParseParams.load(USER_CFG_PATH)
         else:
             cfg = ParseParams.load(DEFAULT_CFG_PATH)
 
@@ -55,31 +61,31 @@ class RapidOCR:
         return cfg
 
     def _initialize(self, cfg: DictConfig):
-        self.text_score = cfg.Global.text_score
-        self.min_height = cfg.Global.min_height
-        self.width_height_ratio = cfg.Global.width_height_ratio
+        self.text_score: float = cfg.Global.text_score
+        self.min_height: int = cfg.Global.min_height
+        self.width_height_ratio: float = cfg.Global.width_height_ratio
 
-        self.use_det = cfg.Global.use_det
+        self.use_det: bool = cfg.Global.use_det
         cfg.Det.engine_cfg = cfg.EngineConfig[cfg.Det.engine_type.value]
         self.text_det = TextDetector(cfg.Det)
 
-        self.use_cls = cfg.Global.use_cls
+        self.use_cls: bool = cfg.Global.use_cls
         cfg.Cls.engine_cfg = cfg.EngineConfig[cfg.Cls.engine_type.value]
         self.text_cls = TextClassifier(cfg.Cls)
 
-        self.use_rec = cfg.Global.use_rec
+        self.use_rec: bool = cfg.Global.use_rec
         cfg.Rec.engine_cfg = cfg.EngineConfig[cfg.Rec.engine_type.value]
         cfg.Rec.font_path = cfg.Global.font_path
         self.text_rec = TextRecognizer(cfg.Rec)
 
         self.load_img = LoadImage()
-        self.max_side_len = cfg.Global.max_side_len
-        self.min_side_len = cfg.Global.min_side_len
+        self.max_side_len: int = cfg.Global.max_side_len
+        self.min_side_len: int = cfg.Global.min_side_len
 
         self.cal_rec_boxes = CalRecBoxes()
 
-        self.return_word_box = cfg.Global.return_word_box
-        self.return_single_char_box = cfg.Global.return_single_char_box
+        self.return_word_box: bool = cfg.Global.return_word_box
+        self.return_single_char_box: bool = cfg.Global.return_single_char_box
 
         self.cfg = cfg
 
@@ -89,11 +95,11 @@ class RapidOCR:
         use_det: Optional[bool] = None,
         use_cls: Optional[bool] = None,
         use_rec: Optional[bool] = None,
-        return_word_box: bool = False,
-        return_single_char_box: bool = False,
-        text_score: float = 0.5,
-        box_thresh: float = 0.5,
-        unclip_ratio: float = 1.6,
+        return_word_box: Optional[bool] = None,
+        return_single_char_box: Optional[bool] = None,
+        text_score: Optional[float] = None,
+        box_thresh: Optional[float] = None,
+        unclip_ratio: Optional[float] = None,
     ) -> Union[TextDetOutput, TextClsOutput, TextRecOutput, RapidOCROutput]:
         self.update_params(
             use_det,
@@ -106,14 +112,17 @@ class RapidOCR:
             unclip_ratio,
         )
 
-        ori_img = self.load_img(img_content)
+        if isinstance(img_content, np.ndarray):
+            ori_img = img_content
+        else:
+            ori_img = self.load_img(img_content)
         img, op_record = self.preprocess_img(ori_img)
         det_res, cls_res, rec_res, cropped_img_list = self.run_ocr_steps(img, op_record)
         return self.build_final_output(
             ori_img, det_res, cls_res, rec_res, cropped_img_list, op_record
         )
 
-    def run_ocr_steps(self, img: np.ndarray, op_record: Dict[str, Any]):
+    def run_ocr_steps(self, img: np.ndarray, op_record: Dict[str, Dict[str ,Any]]):
         det_res, cls_res, rec_res = TextDetOutput(), TextClsOutput(), TextRecOutput()
 
         if self.use_det:
@@ -174,10 +183,10 @@ class RapidOCR:
                 v for i, v in enumerate(det_res.scores) if i not in empty_ids
             ]
 
-            rec_res.txts = [v for i, v in enumerate(rec_res.txts) if i not in empty_ids]
-            rec_res.word_results = [
+            rec_res.txts = tuple((v for i, v in enumerate(rec_res.txts) if i not in empty_ids))
+            rec_res.word_results = tuple((
                 v for i, v in enumerate(rec_res.word_results) if i not in empty_ids
-            ]
+            ))
 
         # 仅分类结果
         if (
@@ -209,17 +218,17 @@ class RapidOCR:
             )
 
         ocr_res = RapidOCROutput(
-            img=ori_img,
+            # img=ori_img,
             boxes=det_res.boxes,
             txts=rec_res.txts,
             scores=rec_res.scores,
             word_results=rec_res.word_results,
             elapse_list=[det_res.elapse, cls_res.elapse, rec_res.elapse],
-            viser=VisRes(
-                text_score=self.cfg.Global.text_score,
-                lang_type=self.cfg.Rec.lang_type,
-                font_path=self.cfg.Global.font_path,
-            ),
+            # viser=VisRes(
+            #     text_score=self.cfg.Global.text_score,
+            #     lang_type=self.cfg.Rec.lang_type,
+            #     font_path=self.cfg.Global.font_path,
+            # ),
         )
 
         ocr_res = self.filter_by_text_score(ocr_res)
@@ -260,24 +269,32 @@ class RapidOCR:
         use_det: Optional[bool] = None,
         use_cls: Optional[bool] = None,
         use_rec: Optional[bool] = None,
-        return_word_box: bool = False,
-        return_single_char_box: bool = False,
-        text_score: float = 0.5,
-        box_thresh: float = 0.5,
-        unclip_ratio: float = 1.6,
+        return_word_box: Optional[bool] = None,
+        return_single_char_box: Optional[bool] = None,
+        text_score: Optional[float] = None,
+        box_thresh: Optional[float] = None,
+        unclip_ratio: Optional[float] = None,
     ):
-        self.use_det = self.use_det if use_det is None else use_det
-        self.use_cls = self.use_cls if use_cls is None else use_cls
-        self.use_rec = self.use_rec if use_rec is None else use_rec
+        if use_det is not None:
+            self.use_det =  use_det
+        if use_cls is not None:
+            self.use_cls = use_cls
+        if use_rec is not None:
+            self.use_rec = use_rec
 
-        self.return_word_box = return_word_box
-        self.return_single_char_box = return_single_char_box
-        self.text_score = text_score
-        self.text_det.postprocess_op.box_thresh = box_thresh
-        self.text_det.postprocess_op.unclip_ratio = unclip_ratio
+        if return_word_box is not None:
+            self.return_word_box = return_word_box
+        if return_single_char_box is not None:
+            self.return_single_char_box = return_single_char_box
+        if text_score is not None:
+            self.text_score = text_score
+        if box_thresh is not None:
+            self.text_det.postprocess_op.box_thresh = box_thresh
+        if unclip_ratio is not None:
+            self.text_det.postprocess_op.unclip_ratio = unclip_ratio
 
-    def preprocess_img(self, ori_img: np.ndarray) -> Tuple[np.ndarray, Dict[str, Any]]:
-        op_record = {}
+    def preprocess_img(self, ori_img: np.ndarray) -> Tuple[np.ndarray, Dict[str, Dict[str, Any]]]:
+        op_record: Dict[str, Dict[str, Any]] = {}
         img, ratio_h, ratio_w = resize_image_within_bounds(
             ori_img, self.min_side_len, self.max_side_len
         )
@@ -285,7 +302,7 @@ class RapidOCR:
         return img, op_record
 
     def detect_and_crop(
-        self, img: np.ndarray, op_record: Dict[str, Any]
+        self, img: np.ndarray, op_record: Dict[str, Dict[str, Any]]
     ) -> Tuple[List[np.ndarray], TextDetOutput]:
         img, op_record = apply_vertical_padding(
             img, op_record, self.width_height_ratio, self.min_height
@@ -350,86 +367,86 @@ class RapidOCRError(Exception):
     pass
 
 
-def parse_args(arg_list: Optional[List[str]] = None):
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-img", "--img_path", type=str, default=None)
-    parser.add_argument("--text_score", type=float, default=0.5)
-    parser.add_argument(
-        "--lang_type",
-        type=str,
-        default="ch",
-        choices=list(v.value for v in LangRec),
-    )
-    parser.add_argument("-vis", "--vis_res", action="store_true", default=False)
-    parser.add_argument("--vis_save_dir", type=Path, default=".")
-    parser.add_argument("--font_path", type=str, default=None)
-    parser.add_argument(
-        "-word", "--return_word_box", action="store_true", default=False
-    )
+# def parse_args(arg_list: Optional[List[str]] = None):
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument("-img", "--img_path", type=str, default=None)
+#     parser.add_argument("--text_score", type=float, default=0.5)
+#     parser.add_argument(
+#         "--lang_type",
+#         type=str,
+#         default="ch",
+#         choices=list(v.value for v in LangRec),
+#     )
+#     parser.add_argument("-vis", "--vis_res", action="store_true", default=False)
+#     parser.add_argument("--vis_save_dir", type=Path, default=".")
+#     parser.add_argument("--font_path", type=str, default=None)
+#     parser.add_argument(
+#         "-word", "--return_word_box", action="store_true", default=False
+#     )
 
-    subparser = parser.add_subparsers(dest="command", help="Sub-command help")
-    parser_cfg = subparser.add_parser("config", help="Generate config file")
-    parser_cfg.add_argument("--save_cfg_file", type=Path, default=None)
-    parser_cfg.set_defaults(func=generate_cfg)
+#     subparser = parser.add_subparsers(dest="command", help="Sub-command help")
+#     parser_cfg = subparser.add_parser("config", help="Generate config file")
+#     parser_cfg.add_argument("--save_cfg_file", type=Path, default=None)
+#     parser_cfg.set_defaults(func=generate_cfg)
 
-    parser_check = subparser.add_parser(
-        "check", help="Check if it is installed correctly "
-    )
-    parser_check.set_defaults(func=check_install)
+#     parser_check = subparser.add_parser(
+#         "check", help="Check if it is installed correctly "
+#     )
+#     parser_check.set_defaults(func=check_install)
 
-    args = parser.parse_args(arg_list)
-    return args
-
-
-def main(arg_list: Optional[List[str]] = None):
-    args = parse_args(arg_list)
-
-    if args.command == "config":
-        generate_cfg(args)
-        return
-
-    params = {
-        "Global.text_score": args.text_score,
-        "Global.return_word_box": args.return_word_box,
-    }
-    ocr_engine = RapidOCR(params=params)
-
-    if args.command == "check":
-        check_install(ocr_engine)
-        return
-
-    if args.img_path is None:
-        raise ValueError("Please input the image path")
-
-    if args.return_word_box:
-        result = ocr_engine(args.img_path, return_word_box=args.return_word_box)
-    else:
-        result = ocr_engine(args.img_path)
-
-    print(result)
-
-    if args.vis_res:
-        vis = VisRes(
-            text_score=args.text_score,
-            font_path=args.font_path,
-            lang_type=LangRec(args.lang_type),
-        )
-        cur_dir = args.vis_save_dir
-
-        if args.return_word_box:
-            words_results = sum(result.word_results, ())
-            words, words_scores, words_boxes = list(zip(*words_results))
-            vis_img = vis(args.img_path, words_boxes, words, words_scores)
-            save_path = cur_dir / f"{Path(args.img_path).stem}_vis_single.png"
-            cv2.imwrite(str(save_path), vis_img)
-            print(f"The vis single result has saved in {save_path}")
-            return
-
-        save_path = cur_dir / f"{Path(args.img_path).stem}_vis.png"
-        vis_img = vis(args.img_path, result.boxes, result.txts, result.scores)
-        cv2.imwrite(str(save_path), vis_img)
-        print(f"The vis result has saved in {save_path}")
+#     args = parser.parse_args(arg_list)
+#     return args
 
 
-if __name__ == "__main__":
-    main()
+# def main(arg_list: Optional[List[str]] = None):
+#     args = parse_args(arg_list)
+
+#     if args.command == "config":
+#         generate_cfg(args)
+#         return
+
+#     params = {
+#         "Global.text_score": args.text_score,
+#         "Global.return_word_box": args.return_word_box,
+#     }
+#     ocr_engine = RapidOCR(params=params)
+
+#     if args.command == "check":
+#         check_install(ocr_engine)
+#         return
+
+#     if args.img_path is None:
+#         raise ValueError("Please input the image path")
+
+#     if args.return_word_box:
+#         result = ocr_engine(args.img_path, return_word_box=args.return_word_box)
+#     else:
+#         result = ocr_engine(args.img_path)
+
+#     print(result)
+
+#     if args.vis_res:
+#         vis = VisRes(
+#             text_score=args.text_score,
+#             font_path=args.font_path,
+#             lang_type=LangRec(args.lang_type),
+#         )
+#         cur_dir = args.vis_save_dir
+
+#         if args.return_word_box:
+#             words_results = sum(result.word_results, ())
+#             words, words_scores, words_boxes = list(zip(*words_results))
+#             vis_img = vis(args.img_path, words_boxes, words, words_scores)
+#             save_path = cur_dir / f"{Path(args.img_path).stem}_vis_single.png"
+#             cv2.imwrite(str(save_path), vis_img)
+#             print(f"The vis single result has saved in {save_path}")
+#             return
+
+#         save_path = cur_dir / f"{Path(args.img_path).stem}_vis.png"
+#         vis_img = vis(args.img_path, result.boxes, result.txts, result.scores)
+#         cv2.imwrite(str(save_path), vis_img)
+#         print(f"The vis result has saved in {save_path}")
+
+
+# if __name__ == "__main__":
+#     main()

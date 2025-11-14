@@ -9,7 +9,7 @@ from typing import List, Optional, Tuple, Union
 import numpy as np
 
 from ..utils.log import logger
-from ..utils.utils import save_img
+# from ..utils.utils import save_img
 from ..utils.vis_res import VisRes
 
 
@@ -34,31 +34,29 @@ class TextRecInput:
 
 @dataclass
 class TextRecOutput:
-    imgs: Optional[List[np.ndarray]] = None
-    txts: Optional[Tuple[str]] = None
-    scores: List[float] = field(default_factory=lambda: [1.0])
-    word_results: Tuple[Tuple[str, float, Optional[List[List[int]]]]] = (
-        ("", 1.0, None),
-    )
-    elapse: Optional[float] = None
-    viser: Optional[VisRes] = None
+	imgs: Optional[List[np.ndarray]] = None
+	txts: Optional[Tuple[str, ...]] = None
+	scores: Optional[Tuple[float, ...]] = None
+	word_results: Optional[Tuple[Tuple[str, float, Optional[List[List[int]]]], ...]] = None
+	elapse: Optional[float] = None
+	viser: Optional[VisRes] = None
 
-    def __len__(self):
-        if self.txts is None:
-            return 0
-        return len(self.txts)
+	def __len__(self):
+		if self.txts is None:
+			return 0
+		return len(self.txts)
 
-    def vis(self, save_path: Optional[Union[str, Path]] = None) -> Optional[np.ndarray]:
-        if self.imgs is None or self.txts is None:
-            logger.warning("No image or txts to visualize.")
-            return None
+	def vis(self, save_path: Optional[Union[str, Path]] = None) -> Optional[np.ndarray]:
+		if self.imgs is None or self.txts is None:
+			logger.warning("No image or txts to visualize.")
+			return None
 
-        vis_img = self.viser.draw_rec_res(self.imgs, self.txts, self.scores)
+		vis_img = self.viser.draw_rec_res(self.imgs, self.txts, self.scores)
 
-        if save_path is not None:
-            save_img(save_path, vis_img)
-            logger.info("Visualization saved as %s", save_path)
-        return vis_img
+		# if save_path is not None:
+		#     save_img(save_path, vis_img)
+		#     logger.info("Visualization saved as %s", save_path)
+		return vis_img
 
 
 class WordType(Enum):

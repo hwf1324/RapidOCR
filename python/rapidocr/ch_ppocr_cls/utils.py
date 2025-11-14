@@ -18,7 +18,7 @@ from typing import List, Optional, Tuple, Union
 import numpy as np
 
 from ..utils.log import logger
-from ..utils.utils import save_img
+# from ..utils.utils import save_img
 from ..utils.vis_res import VisRes
 
 
@@ -44,9 +44,9 @@ class TextClsOutput:
         vis = VisRes()
         vis_img = vis.draw_rec_res(self.img_list, txts, scores)
 
-        if save_path is not None:
-            save_img(save_path, vis_img)
-            logger.info("Visualization saved as %s", save_path)
+        # if save_path is not None:
+        #     save_img(save_path, vis_img)
+        #     logger.info("Visualization saved as %s", save_path)
         return vis_img
 
 
