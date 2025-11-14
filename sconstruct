@@ -100,7 +100,7 @@ def InstallDependencies(target, source, env):
 env.Append(BUILDERS={"InstallDeps": env.Builder(action=InstallDependencies),})
 
 # Define targets and dependencies
-deps_target = env.InstallDeps(LIBS_DIR, REQUIREMENTS_FILE)
+deps_target = env.InstallDeps(LIB_DIR, REQUIREMENTS_FILE)
 
 # Copy plugin source directory to target directory
 copy_action = env.Command(PLUGIN_TARGET_DIR, PLUGIN_SOURCE_DIR, Copy("$TARGET", "$SOURCE"))
