@@ -6,7 +6,7 @@
 import os
 import os.path
 import sys
-import subprocess
+import shutil
 from pathlib import Path
 from collections.abc import Iterable
 from typing import Final
@@ -15,7 +15,7 @@ from typing import Final
 # Linters aren't aware about them.
 # To avoid PyRight `reportUndefinedVariable` errors about them they are imported explicitly.
 # When using other  Scons functions please add them to the line below.
-from SCons.Script import EnsurePythonVersion, Variables, BoolVariable, Environment, Copy, Mkdir
+from SCons.Script import EnsurePythonVersion, Variables, BoolVariable, Environment, Copy
 
 # Imports for type hints
 from SCons.Node import FS
@@ -30,12 +30,16 @@ sys.dont_write_bytecode = True
 import buildVars  # NOQA: E402
 
 
-REQUIREMENTS_FILE = "python/requirements.txt"
-PLUGIN_SOURCE_DIR = "python/rapidocr"
-PLUGIN_TARGET_DIR = "addon/globalPlugins/rapidocr"
-LIB_DIR = "addon/globalPlugins/rapidocr/lib"
+REQUIREMENTS_FILE = Path("python/requirements.txt")
+PLUGIN_SOURCE_DIR = Path("python/rapidocr")
+PLUGIN_TARGET_DIR = Path("addon/globalPlugins/rapidocr")
+LIB_DIR = Path("addon/globalPlugins/rapidocr/lib")
 WHEEL_PLATFORM = "win_amd64"
 NVDA_PYTHON_VERSION = "3.13"
+
+
+# Copy plugin source directory to target directory
+shutil.copytree(PLUGIN_SOURCE_DIR, PLUGIN_TARGET_DIR)
 
 
 def validateVersionNumber(key: str, val: str, _):
@@ -71,9 +75,6 @@ env.Append(
 	brailleTables=buildVars.brailleTables,
 	symbolDictionaries=buildVars.symbolDictionaries,
 )
-
-# Copy plugin source directory to target directory
-copyAddon = env.Command(PLUGIN_TARGET_DIR, PLUGIN_SOURCE_DIR, Copy("$TARGET", "$SOURCE"))
 
 # Install required dependencies for Windows platform using pip download
 installDependencies = env.Command(
