@@ -72,48 +72,22 @@ env.Append(
 	symbolDictionaries=buildVars.symbolDictionaries,
 )
 
-
-# Custom builder function to download dependencies for specific platform and Python version
-def InstallDependencies(target, source, env):
-	"""
-	Install required dependencies for Windows platform using pip download
-	"""
-	cmd = [
-		"pip",
-		"install",
-		"--no-deps",
-		"--no-compile",
-		"-r",
-		REQUIREMENTS_FILE,
-		"-t",
-		LIB_DIR,
-		"--platform",
-		WHEEL_PLATFORM,
-		"--python-version",
-		NVDA_PYTHON_VERSION,
-	]
-	subprocess.run(cmd, check=True)
-	return target, source
-
-
-# Add custom builders to environment
-env.Append(BUILDERS={"InstallDeps": env.Builder(action=InstallDependencies),})
-
-# Define targets and dependencies
-deps_target = env.InstallDeps(LIB_DIR, REQUIREMENTS_FILE)
-
-# Copy plugin source directory to target directory
-copy_action = env.Command(PLUGIN_TARGET_DIR, PLUGIN_SOURCE_DIR, Copy("$TARGET", "$SOURCE"))
-
 # Ensure parent directory exists
 env.Command("addon/globalPlugins", [], Mkdir("$TARGET"))
 
-# Set proper dependencies between actions
-env.Depends(copy_action, "addon/globalPlugins")
-env.Depends(deps_target, copy_action)
+# Copy plugin source directory to target directory
+copyAddon = env.Command(PLUGIN_TARGET_DIR, PLUGIN_SOURCE_DIR, Copy("$TARGET", "$SOURCE"))
 
-# Create alias for the preparation process
-prepareAddon= env.Alias("prepare_addon", [deps_target, copy_action])
+# Install required dependencies for Windows platform using pip download
+installDependencies = env.Command(
+	LIB_DIR,
+	REQUIREMENTS_FILE,
+	f"pip install --no-deps --no-compile -r $SOURCE -t $TARGET --platform {WHEEL_PLATFORM} --python-version {NVDA_PYTHON_VERSION}",
+)
+
+# Set proper dependencies between actions
+env.Requires(copyAddon, "addon/globalPlugins")
+env.Depends(installDependencies, copyAddon)
 
 
 if env["dev"]:
@@ -199,7 +173,7 @@ manifest = env.NVDAManifest(env.File(addonDir/"manifest.ini"), "manifest.ini.tpl
 # Ensure manifest is rebuilt if buildVars is updated.
 env.Depends(manifest, "buildVars.py")
 
-env.Depends(addon, prepareAddon)
+env.Depends(addon, installDependencies)
 env.Depends(addon, manifest)
 env.Default(addon)
 env.Clean(addon, [".sconsign.dblite", "addon/doc/" + buildVars.baseLanguage + "/"])
