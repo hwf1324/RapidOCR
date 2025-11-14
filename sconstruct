@@ -82,10 +82,6 @@ installDependencies = env.Command(
 	f"pip install --no-deps --no-compile -r $SOURCE -t $TARGET --platform {WHEEL_PLATFORM} --python-version {NVDA_PYTHON_VERSION}",
 )
 
-# Set proper dependencies between actions
-env.Requires(installDependencies, PLUGIN_TARGET_DIR)
-
-
 if env["dev"]:
 	from datetime import date
 
