@@ -72,9 +72,6 @@ env.Append(
 	symbolDictionaries=buildVars.symbolDictionaries,
 )
 
-# Ensure parent directory exists
-env.Command("addon/globalPlugins", [], Mkdir("$TARGET"))
-
 # Copy plugin source directory to target directory
 copyAddon = env.Command(PLUGIN_TARGET_DIR, PLUGIN_SOURCE_DIR, Copy("$TARGET", "$SOURCE"))
 
@@ -86,8 +83,7 @@ installDependencies = env.Command(
 )
 
 # Set proper dependencies between actions
-env.Requires(copyAddon, "addon/globalPlugins")
-env.Depends(installDependencies, copyAddon)
+env.Requires(installDependencies, PLUGIN_TARGET_DIR)
 
 
 if env["dev"]:
